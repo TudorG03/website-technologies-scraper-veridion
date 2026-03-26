@@ -23,6 +23,26 @@ const technologies: Record<string, WappalyzerTech> = {
         scriptSrc: ['lowconf\\.js\\;confidence:30'],
         website: 'https://example.com',
     },
+    DomArray: {
+        dom: ["iframe[src*='app.example.com']"],
+        website: 'https://example.com',
+    },
+    DomExists: {
+        dom: { "meta[name='generator']": { exists: '' } },
+        website: 'https://example.com',
+    },
+    DomText: {
+        dom: { 'h1.title': { text: 'Welcome to ([\\w]+)\\;version:\\1' } },
+        website: 'https://example.com',
+    },
+    DomAttributes: {
+        dom: { "link[href*='themes/astra']": { attributes: { href: 'astra\\S*\\.css(?:\\?ver=([\\d.]+))?\\;version:\\1' } } },
+        website: 'https://example.com',
+    },
+    DomEmptySpec: {
+        dom: { 'script.some-widget': {} },
+        website: 'https://example.com',
+    },
 }
 
 const mockLogger = {
@@ -118,5 +138,49 @@ describe('FingerprintService', () => {
         const results = service.fingerprint(signals)
         const jquery = results.find(r => r.name === 'jQuery')
         expect(jquery?.wappalyzerReference).toBe('https://jquery.com')
+    })
+
+    it('detects array-style dom technology when signal key matches selector', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'dom', key: "iframe[src*='app.example.com']", value: '' }
+        ]
+        const results = service.fingerprint(signals)
+        expect(results.map(r => r.name)).toContain('DomArray')
+    })
+
+    it('detects dom technology with exists spec', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'dom', key: "meta[name='generator']", value: '' }
+        ]
+        const results = service.fingerprint(signals)
+        expect(results.map(r => r.name)).toContain('DomExists')
+    })
+
+    it('detects dom technology with text spec and extracts version', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'dom', key: 'h1.title', value: 'Welcome to MyApp' }
+        ]
+        const results = service.fingerprint(signals)
+        const tech = results.find(r => r.name === 'DomText')
+        expect(tech).toBeDefined()
+        expect(tech?.evidence[0].version).toBe('MyApp')
+    })
+
+    it('detects dom technology with attributes spec and extracts version', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'dom', key: "link[href*='themes/astra']", value: '/wp-content/themes/astra/style.css?ver=3.9.2' }
+        ]
+        const results = service.fingerprint(signals)
+        const tech = results.find(r => r.name === 'DomAttributes')
+        expect(tech).toBeDefined()
+        expect(tech?.evidence[0].version).toBe('3.9.2')
+    })
+
+    it('detects dom technology with empty spec as exists check', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'dom', key: 'script.some-widget', value: '' }
+        ]
+        const results = service.fingerprint(signals)
+        expect(results.map(r => r.name)).toContain('DomEmptySpec')
     })
 })

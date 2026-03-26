@@ -1,9 +1,9 @@
-import { version } from 'node:punycode'; import Evidence from '../../interfaces/Evidence'
+import Evidence from '../../interfaces/Evidence'
 import TechnologyResult from '../../interfaces/TechnologyResult'
 import LoggerService from '../../logger/LoggerService'
 import RawSignal from '../../types/RawSignal'
 import SignalType from '../../types/SignalType'
-import WappalyzerTech from '../../types/WappalyzerTech'
+import WappalyzerTech, { WappalyzerDomSpec } from '../../types/WappalyzerTech'
 import { parsePattern, applyPattern } from './patternUtils'
 
 interface TechAccumulator {
@@ -47,10 +47,11 @@ class FingerprintService {
     private matchTechnology(technology: WappalyzerTech, signals: RawSignal[]): TechAccumulator {
         const list = this.matchListFields(technology, signals)
         const map = this.matchMapFields(technology, signals)
+        const dom = this.matchDomFields(technology, signals)
 
         return {
-            evidence: [...list.evidence, ...map.evidence],
-            confidence: Math.min(100, list.confidence + map.confidence)
+            evidence: [...list.evidence, ...map.evidence, ...dom.evidence],
+            confidence: Math.min(100, list.confidence + map.confidence + dom.confidence)
         }
     }
 
@@ -120,7 +121,7 @@ class FingerprintService {
                     for (const signal of keySignals) {
                         const result = applyPattern(parsed, signal.value)
                         if (result.matched) {
-                            evidence.push(this.buildEvidence(signal, signalType, pattern, version))
+                            evidence.push(this.buildEvidence(signal, signalType, pattern, result.version))
                             confidence = Math.min(100, confidence + parsed.confidence)
                         }
                     }
@@ -132,6 +133,72 @@ class FingerprintService {
             evidence,
             confidence
         }
+    }
+
+    private matchDomFields(technology: WappalyzerTech, signals: RawSignal[]): TechAccumulator {
+        const evidence: Evidence[] = []
+        let confidence = 0
+
+        if (!technology.dom) return { evidence, confidence }
+
+        const domSignals = signals.filter(s => s.signalType === 'dom')
+
+        if (typeof technology.dom === 'string' || Array.isArray(technology.dom)) {
+            const selectors = Array.isArray(technology.dom) ? technology.dom : [technology.dom]
+
+            for (const selector of selectors) {
+                const parsed = parsePattern(selector)
+                if (!parsed) continue
+                const rawSelector = selector.split('\\;')[0]
+
+                for (const signal of domSignals.filter(s => s.key === rawSelector)) {
+                    evidence.push(this.buildEvidence(signal, 'dom', selector))
+                    confidence = Math.min(100, confidence + parsed.confidence)
+                }
+            }
+        } else {
+            for (const [selector, spec] of Object.entries(technology.dom as Record<string, WappalyzerDomSpec>)) {
+                const matching = domSignals.filter(s => s.key === selector)
+
+                for (const signal of matching) {
+                    const isExistsOnly = spec.exists !== undefined || (spec.text === undefined && spec.attributes === undefined)
+
+                    if (isExistsOnly) {
+                        const parsed = parsePattern(spec.exists ?? '')
+                        if (parsed) {
+                            evidence.push(this.buildEvidence(signal, 'dom', selector))
+                            confidence = Math.min(100, confidence + parsed.confidence)
+                        }
+                    }
+
+                    if (spec.text !== undefined) {
+                        const parsed = parsePattern(spec.text)
+                        if (parsed) {
+                            const result = applyPattern(parsed, signal.value)
+                            if (result.matched) {
+                                evidence.push(this.buildEvidence(signal, 'dom', spec.text, result.version))
+                                confidence = Math.min(100, confidence + parsed.confidence)
+                            }
+                        }
+                    }
+
+                    if (spec.attributes !== undefined) {
+                        for (const [, pattern] of Object.entries(spec.attributes)) {
+                            const parsed = parsePattern(pattern)
+                            if (parsed) {
+                                const result = applyPattern(parsed, signal.value)
+                                if (result.matched) {
+                                    evidence.push(this.buildEvidence(signal, 'dom', pattern, result.version))
+                                    confidence = Math.min(100, confidence + parsed.confidence)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return { evidence, confidence }
     }
 
     private buildEvidence(signal: RawSignal, signalType: SignalType, pattern: string, version?: string): Evidence {
