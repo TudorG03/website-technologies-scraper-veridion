@@ -43,6 +43,31 @@ const technologies: Record<string, WappalyzerTech> = {
         dom: { 'script.some-widget': {} },
         website: 'https://example.com',
     },
+    ImplierA: {
+        scriptSrc: ['tech-a\\.js'],
+        implies: ['ImpliedB'],
+        website: 'https://example.com',
+    },
+    ImpliedB: {
+        implies: ['ImpliedC'],
+        website: 'https://example.com',
+    },
+    ImpliedC: {
+        website: 'https://example.com',
+    },
+    ImplierWithConfidence: {
+        scriptSrc: ['tech-conf\\.js'],
+        implies: ['ImpliedLowConf\\;confidence:40'],
+        website: 'https://example.com',
+    },
+    ImpliedLowConf: {
+        website: 'https://example.com',
+    },
+    LowConfImplier: {
+        scriptSrc: ['lowconf-implier\\.js\\;confidence:30'],
+        implies: ['ImpliedC'],
+        website: 'https://example.com',
+    },
 }
 
 const mockLogger = {
@@ -182,5 +207,60 @@ describe('FingerprintService', () => {
         ]
         const results = service.fingerprint(signals)
         expect(results.map(r => r.name)).toContain('DomEmptySpec')
+    })
+
+    it('implied technology appears in output with implied true', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'scriptSrc', key: 'scriptSrc', value: 'tech-a.js' }
+        ]
+        const results = service.fingerprint(signals)
+        const implied = results.find(r => r.name === 'ImpliedB')
+        expect(implied).toBeDefined()
+        expect(implied?.implied).toBe(true)
+    })
+
+    it('implied technology has impliedBy set to the detecting technology name', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'scriptSrc', key: 'scriptSrc', value: 'tech-a.js' }
+        ]
+        const results = service.fingerprint(signals)
+        const implied = results.find(r => r.name === 'ImpliedB')
+        expect(implied?.impliedBy).toBe('ImplierA')
+    })
+
+    it('implied technology has empty evidence array', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'scriptSrc', key: 'scriptSrc', value: 'tech-a.js' }
+        ]
+        const results = service.fingerprint(signals)
+        const implied = results.find(r => r.name === 'ImpliedB')
+        expect(implied?.evidence).toEqual([])
+    })
+
+    it('resolves transitive implies chain A -> B -> C', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'scriptSrc', key: 'scriptSrc', value: 'tech-a.js' }
+        ]
+        const results = service.fingerprint(signals)
+        const names = results.map(r => r.name)
+        expect(names).toContain('ImplierA')
+        expect(names).toContain('ImpliedB')
+        expect(names).toContain('ImpliedC')
+    })
+
+    it('excludes implied technology when confidence tag is below 50', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'scriptSrc', key: 'scriptSrc', value: 'tech-conf.js' }
+        ]
+        const results = service.fingerprint(signals)
+        expect(results.map(r => r.name)).not.toContain('ImpliedLowConf')
+    })
+
+    it('does not imply technologies when the implying tech has confidence below 50', () => {
+        const signals: RawSignal[] = [
+            { signalType: 'scriptSrc', key: 'scriptSrc', value: 'lowconf-implier.js' }
+        ]
+        const results = service.fingerprint(signals)
+        expect(results.map(r => r.name)).not.toContain('ImpliedC')
     })
 })

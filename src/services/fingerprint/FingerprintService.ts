@@ -8,7 +8,9 @@ import { parsePattern, applyPattern } from './patternUtils'
 
 interface TechAccumulator {
     evidence: Evidence[],
-    confidence: number
+    confidence: number,
+    implied: boolean,
+    impliedBy: string | undefined
 }
 
 class FingerprintService {
@@ -26,6 +28,8 @@ class FingerprintService {
             }
         }
 
+        this.resolveImplies(results)
+
         const technologyResults: TechnologyResult[] = []
 
         results.forEach((acc, techName) => {
@@ -35,8 +39,8 @@ class FingerprintService {
                     wappalyzerReference: this.technologies[techName].website ?? '',
                     evidence: acc.evidence,
                     confidence: acc.confidence,
-                    implied: false,
-                    impliedBy: undefined
+                    implied: acc.implied,
+                    impliedBy: acc.impliedBy
                 })
             }
         })
@@ -51,7 +55,9 @@ class FingerprintService {
 
         return {
             evidence: [...list.evidence, ...map.evidence, ...dom.evidence],
-            confidence: Math.min(100, list.confidence + map.confidence + dom.confidence)
+            confidence: Math.min(100, list.confidence + map.confidence + dom.confidence),
+            implied: false,
+            impliedBy: undefined
         }
     }
 
@@ -88,7 +94,9 @@ class FingerprintService {
 
         return {
             evidence,
-            confidence
+            confidence,
+            implied: false,
+            impliedBy: undefined
         }
     }
 
@@ -131,7 +139,9 @@ class FingerprintService {
 
         return {
             evidence,
-            confidence
+            confidence,
+            implied: false,
+            impliedBy: undefined
         }
     }
 
@@ -139,7 +149,14 @@ class FingerprintService {
         const evidence: Evidence[] = []
         let confidence = 0
 
-        if (!technology.dom) return { evidence, confidence }
+        if (!technology.dom) {
+            return {
+                evidence,
+                confidence,
+                implied: false,
+                impliedBy: undefined
+            }
+        }
 
         const domSignals = signals.filter(s => s.signalType === 'dom')
 
@@ -198,7 +215,65 @@ class FingerprintService {
             }
         }
 
-        return { evidence, confidence }
+        return {
+            evidence,
+            confidence,
+            implied: false,
+            impliedBy: undefined
+        }
+    }
+
+    private resolveImplies(computedTechnologies: Map<string, TechAccumulator>): void {
+        let found = true
+
+        while (found) {
+            found = false
+            for (const technologyName of computedTechnologies.keys()) {
+                const impliesField = this.technologies[technologyName]?.implies;
+
+                if (impliesField === undefined) {
+                    continue
+                }
+
+                const impliesArray = Array.isArray(impliesField) ? impliesField : [impliesField]
+
+                const implierConfidence = computedTechnologies.get(technologyName)?.confidence
+
+                if (implierConfidence !== undefined && implierConfidence < 50) {
+                    continue
+                }
+
+                if (impliesArray && impliesArray.length > 0) {
+                    for (const impliedTechnology of impliesArray) {
+                        let confidence = 100
+                        const impliedTechnologyParts = impliedTechnology?.split('\\;')
+
+                        if (impliedTechnologyParts &&
+                            !computedTechnologies.has(impliedTechnologyParts[0]) &&
+                            this.technologies[impliedTechnologyParts[0]]) {
+                            for (const part of impliedTechnologyParts) {
+                                if (part.startsWith('confidence')) {
+                                    confidence = parseInt(part.split(':')[1])
+                                }
+                            }
+
+                            if (confidence >= 50) {
+                                found = true
+                                computedTechnologies.set(
+                                    impliedTechnologyParts[0],
+                                    {
+                                        evidence: [],
+                                        confidence,
+                                        implied: true,
+                                        impliedBy: technologyName
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private buildEvidence(signal: RawSignal, signalType: SignalType, pattern: string, version?: string): Evidence {
