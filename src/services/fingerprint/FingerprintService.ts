@@ -85,7 +85,7 @@ class FingerprintService {
                 for (const signal of typeSignals) {
                     const result = applyPattern(parsed, signal.value)
                     if (result.matched) {
-                        evidence.push(this.buildEvidence(signal, signalType, pattern, result.version))
+                        evidence.push(this.buildEvidence(signal, signalType, pattern, result.version, result.matchedValue))
                         confidence = Math.min(100, confidence + parsed.confidence)
                     }
                 }
@@ -129,7 +129,7 @@ class FingerprintService {
                     for (const signal of keySignals) {
                         const result = applyPattern(parsed, signal.value)
                         if (result.matched) {
-                            evidence.push(this.buildEvidence(signal, signalType, pattern, result.version))
+                            evidence.push(this.buildEvidence(signal, signalType, pattern, result.version, result.matchedValue))
                             confidence = Math.min(100, confidence + parsed.confidence)
                         }
                     }
@@ -193,7 +193,7 @@ class FingerprintService {
                         if (parsed) {
                             const result = applyPattern(parsed, signal.value)
                             if (result.matched) {
-                                evidence.push(this.buildEvidence(signal, 'dom', spec.text, result.version))
+                                evidence.push(this.buildEvidence(signal, 'dom', spec.text, result.version, result.matchedValue))
                                 confidence = Math.min(100, confidence + parsed.confidence)
                             }
                         }
@@ -205,7 +205,7 @@ class FingerprintService {
                             if (parsed) {
                                 const result = applyPattern(parsed, signal.value)
                                 if (result.matched) {
-                                    evidence.push(this.buildEvidence(signal, 'dom', pattern, result.version))
+                                    evidence.push(this.buildEvidence(signal, 'dom', pattern, result.version, result.matchedValue))
                                     confidence = Math.min(100, confidence + parsed.confidence)
                                 }
                             }
@@ -276,11 +276,11 @@ class FingerprintService {
         }
     }
 
-    private buildEvidence(signal: RawSignal, signalType: SignalType, pattern: string, version?: string): Evidence {
+    private buildEvidence(signal: RawSignal, signalType: SignalType, pattern: string, version?: string, matchedValue?: string): Evidence {
         return {
             signalType,
             key: signal.key,
-            value: signal.value,
+            value: matchedValue ?? signal.value,
             regex: pattern.split('\\;')[0],
             version
         }

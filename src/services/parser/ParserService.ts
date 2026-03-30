@@ -96,6 +96,9 @@ class ParserService implements IService {
                 }
             } else {
                 for (const [selector, spec] of Object.entries(tech.dom as Record<string, WappalyzerDomSpec>)) {
+                    const hasImplementedChecks = spec.exists !== undefined || spec.text !== undefined || spec.attributes !== undefined
+                    if (!hasImplementedChecks) continue
+
                     if (!patterns[selector]) patterns[selector] = {}
 
                     if (spec.exists !== undefined || (!spec.text && !spec.attributes)) {

@@ -4,5 +4,6 @@ CLAUDE.md
 dist/
 .env
 data/technologies/
+data/output/
 logs/
 .claude/sessions/

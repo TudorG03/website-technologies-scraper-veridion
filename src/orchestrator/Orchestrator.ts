@@ -13,6 +13,8 @@ import TechnologyResult from '../interfaces/TechnologyResult'
 import PageData from '../types/PageData'
 
 class Orchestrator implements IService {
+    private totalTechnologies: number = 0
+
     constructor(
         private config: ConfigService,
         private logger: LoggerService,
@@ -76,7 +78,7 @@ class Orchestrator implements IService {
             )
         }
 
-        this.logger.info('Run complete')
+        this.logger.info('Run complete! Found ' + this.totalTechnologies + " technologies")
     }
 
     private async processDomain(domain: string): Promise<DomainResult> {
@@ -90,11 +92,13 @@ class Orchestrator implements IService {
                 technologies = this.parserService.parse(playwrightData)
 
                 const result = this.buildResult(domain, playwrightData, technologies, 'success')
+                this.totalTechnologies += result.technologies.length
                 await this.outputWriter.write(result)
                 return result
             }
 
             const result = this.buildResult(domain, pageData, technologies, 'success')
+            this.totalTechnologies += result.technologies.length
             await this.outputWriter.write(result)
             return result
 

@@ -45,29 +45,28 @@ export function extractVersion(template: string, match: RegExpMatchArray): strin
     })
 }
 
-export function applyPattern(parsed: ParsedPattern, value: string): { matched: boolean, version?: string } {
-    let matched = false
-    let version = undefined
-
+export function applyPattern(parsed: ParsedPattern, value: string): { matched: boolean, version?: string, matchedValue: string } {
     if (parsed.regex === null) {
         return {
             matched: true,
-            version: undefined
+            version: undefined,
+            matchedValue: ''
         }
     }
 
     const matchArr = value.match(parsed.regex)
 
-    if (matchArr) {
-        matched = true;
-
-        if (parsed.versionTemplate) {
-            version = extractVersion(parsed.versionTemplate, matchArr) || undefined
-        }
+    if (!matchArr) {
+        return { matched: false, matchedValue: '' }
     }
 
+    const version = parsed.versionTemplate
+        ? extractVersion(parsed.versionTemplate, matchArr) || undefined
+        : undefined
+
     return {
-        matched,
-        version
+        matched: true,
+        version,
+        matchedValue: matchArr[0]
     }
 }
