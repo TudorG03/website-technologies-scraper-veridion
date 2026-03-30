@@ -1,4 +1,5 @@
 node_modules/
+scripts/.venv
 CLAUDE.md
 dist/
 .env
