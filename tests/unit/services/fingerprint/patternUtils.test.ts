@@ -85,7 +85,7 @@ describe('parsePattern', () => {
 describe('applyPattern', () => {
     it('null regex always matches', () => {
         const parsed: ParsedPattern = { regex: null, confidence: 100 }
-        expect(applyPattern(parsed, 'anything')).toEqual({ matched: true, version: undefined })
+        expect(applyPattern(parsed, 'anything')).toEqual({ matched: true, version: undefined, matchedValue: '' })
     })
 
     it('matching regex returns matched true', () => {
@@ -95,7 +95,7 @@ describe('applyPattern', () => {
 
     it('non-matching regex returns matched false', () => {
         const parsed: ParsedPattern = { regex: /jquery/i, confidence: 100 }
-        expect(applyPattern(parsed, 'angular.js')).toEqual({ matched: false })
+        expect(applyPattern(parsed, 'angular.js')).toEqual({ matched: false, matchedValue: '' })
     })
 
     it('extracts version from capture group', () => {
@@ -104,7 +104,7 @@ describe('applyPattern', () => {
             confidence: 100,
             versionTemplate: '\\1'
         }
-        expect(applyPattern(parsed, 'jquery.js?ver=3.6.0')).toEqual({ matched: true, version: '3.6.0' })
+        expect(applyPattern(parsed, 'jquery.js?ver=3.6.0')).toEqual({ matched: true, version: '3.6.0', matchedValue: 'jquery.js?ver=3.6.0' })
     })
 
     it('returns undefined version when capture group did not match', () => {
