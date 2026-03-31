@@ -6,7 +6,9 @@
     "author": "Tudor Gheorghiu",
     "main": "dist/index.js",
     "scripts": {
-        "test": "jest"
+        "test": "jest",
+        "postinstall": "ts-node scripts/fetch-technologies.ts",
+        "fetch-technologies": "ts-node scripts/fetch-technologies.ts"
     },
     "dependencies": {
         "cheerio": "^1.2.0",

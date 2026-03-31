@@ -1,6 +1,8 @@
 node_modules/
+scripts/.venv
 CLAUDE.md
 dist/
 .env
 data/technologies/
 logs/
+.claude/sessions/
