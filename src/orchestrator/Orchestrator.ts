@@ -64,18 +64,28 @@ class Orchestrator implements IService {
             (domain) => this.processDomain(domain)
         )
 
-        const failed = results
+        const failedDomains = results
             .filter(r => r.status === 'failed')
             .map(r => r.domain)
 
-        if (failed.length > 0) {
-            this.logger.info(`Retrying ${failed.length} failed domains`)
+        let finalFailed: DomainResult[]
 
-            await this.pool.run(
-                failed,
+        if (failedDomains.length > 0) {
+            this.logger.info(`Retrying ${failedDomains.length} failed domains`)
+
+            const retryResults = await this.pool.run(
+                failedDomains,
                 this.config.getConcurrencyFetch(),
                 (domain) => this.processDomain(domain)
             )
+
+            finalFailed = retryResults.filter(r => r.status === 'failed')
+        } else {
+            finalFailed = []
+        }
+
+        for (const result of finalFailed) {
+            await this.outputWriter.write(result)
         }
 
         this.logger.info('Run complete! Found ' + this.totalTechnologies + " technologies")
@@ -106,16 +116,13 @@ class Orchestrator implements IService {
             const msg = error instanceof Error ? error.message : String(error)
             this.logger.warn(`Failed to process ${domain}: ${msg}`)
 
-            const result: DomainResult = {
+            return {
                 domain,
                 finalUrl: '',
                 status: 'failed',
                 technologies: [],
                 crawledAt: new Date().toISOString()
             }
-
-            await this.outputWriter.write(result)
-            return result
         }
     }
 

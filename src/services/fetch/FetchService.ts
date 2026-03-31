@@ -19,14 +19,28 @@ class FetchService implements IService {
     async cleanup(): Promise<void> { }
 
     async fetch(domain: string): Promise<PageData> {
-        try {
-            return await this.attemptFetch('https://' + domain)
-        } catch (error) {
-            if (error instanceof Error && error.message.includes('timed out')) throw error
-            if (error instanceof Error && error.message.startsWith('Status code')) throw error
-            this.logger.debug(`HTTPS failed for ${domain}, trying HTTP`)
-            return await this.attemptFetch('http://' + domain)
+        const candidates = [
+            'https://' + domain,
+            'http://' + domain,
+            'https://www.' + domain,
+            'http://www.' + domain,
+        ]
+
+        let lastError: Error = new Error(`All URLs failed for ${domain}`)
+
+        for (const url of candidates) {
+            try {
+                return await this.attemptFetch(url)
+            } catch (error) {
+                if (!(error instanceof Error)) throw error
+                if (error.message.includes('timed out')) throw error
+                if (error.message.startsWith('Status code')) throw error
+                lastError = error
+                this.logger.debug(`Failed ${url}, trying next candidate`)
+            }
         }
+
+        throw lastError
     }
 
     private async attemptFetch(url: string): Promise<PageData> {
