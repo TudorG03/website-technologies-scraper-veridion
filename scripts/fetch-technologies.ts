@@ -28,7 +28,8 @@ const fetchAndSave = async (url: string): Promise<void> => {
     console.log(`Downloaded ${filename}`);
 }
 
-Promise.all(urls.map(fetchAndSave))
+fs.promises.mkdir(technologiesDir, { recursive: true })
+    .then(() => Promise.all(urls.map(fetchAndSave)))
     .then(() => console.log('All technology files downloaded.'))
     .catch((err) => {
         console.error('Failed to download technology files:', err)
