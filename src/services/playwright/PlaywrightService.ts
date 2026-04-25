@@ -89,14 +89,14 @@ class PlaywrightService implements IService {
     }
 
     async fetch(url: string): Promise<PageData> {
-        const context = await this.browser.newContext()
+        const context = await this.browser.newContext({ ignoreHTTPSErrors: true })
         const page = await context.newPage()
         const normalizedUrl = 'https://' + url
 
         try {
             page.setDefaultTimeout(this.config.getRequestTimeoutMs())
             this.logger.debug(`Playwright fetching ${normalizedUrl}`)
-            const response = await page.goto(normalizedUrl, { waitUntil: 'networkidle' })
+            const response = await page.goto(normalizedUrl, { waitUntil: 'load' })
             const headers: Record<string, string> = response?.headers() ?? {}
             const cookies = (await context.cookies()).map(c => `${c.name}=${c.value}`)
             const html = await page.content()
